@@ -16,7 +16,7 @@ void sigchld_handler(int s)
 }
 
 
-int main(void)
+int main(int argc, char * argv[])
 {
     /* 1. setup */
 
@@ -24,8 +24,8 @@ int main(void)
     struct addrinfo sock_spesifics, * server_adds_list, server_add;
     struct sockaddr_storage client_add;
     socklen_t sin_size = sizeof client_add;
-    char ip[INET6_ADDRSTRLEN];
     struct sigaction sa;
+    char ip[INET6_ADDRSTRLEN], buf[MSGLEN + 1] = {0}, * token;
 
     // We'll work IPv6 using TCP and this hosts IP
     bzero(& sock_spesifics, sizeof sock_spesifics);
@@ -42,6 +42,7 @@ int main(void)
     server_sock = get_working_socket(server_adds_list, & server_add, SERVER);
 
     freeaddrinfo(server_adds_list);
+
 
 
     /* 3. Getting ready to handle clients */
@@ -77,27 +78,21 @@ int main(void)
         {
             close(server_sock);
 
-            if (send(client_sock, "Hello, world!", 13, 0) == -1) perror("send");
+            if (recv(client_sock, buf, MSGLEN, 0) == -1) throw("could not recive nessage");
 
+            printf("The client's message is: %s \n", buf);
 
-            /**
-             * 
-             * This where most of the wotk is done.
-             * We need to accept requests.
-             * Read and Write to files.
-             * Convert to base64 before we send one.
-             * Send accept or error.
-             * Syncronize processes.
-             * And so own.
-             * 
-             * **/
+            token = strtok(buf, " ");
+
+            if      (strcmp(token, "GET") == 0)  printf("the client requests to retrive a file \n");
+            else if (strcmp(token, "POST") == 0) printf("the client requests to post a file \n");
+            else                                 perror("unfamiliar request \n");
 
 
             close(client_sock);
             exit(EXIT_SUCCESS);
         }
 
-        // parent doesn't need this
         close(client_sock);
     }
 

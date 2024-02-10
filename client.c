@@ -1,21 +1,18 @@
 #include "protocol.h"
 
-#define BUFLEN 100
-
 
 
 
 int main(int argc, char *argv[])
 {
-    if (argc < 2) throw("usage: ./client <host name>");
+    if (argc < 4) throw("usage: ./client <host name> <request> <path>");
 
 
     /* 1. set up */
 
-    int sockfd, recived_bytes, get_adds_status;
+    int sockfd, get_adds_status;
     struct addrinfo sock_spesifics, * server_adds_list, server_add;
-
-    char ip[INET6_ADDRSTRLEN], buf[BUFLEN + 1] = {0};
+    char ip[INET6_ADDRSTRLEN], buf[MSGLEN + 1] = {0};
 
     // We'll work IPv6 using TCP
     bzero( & sock_spesifics, sizeof sock_spesifics);
@@ -39,8 +36,10 @@ int main(int argc, char *argv[])
 
     /* 3. sending a message */
 
-    if ((recived_bytes = recv(sockfd, buf, BUFLEN, 0)) == -1) throw("did not recive any message");
-    printf("client: received '%s'\n", buf);
+    strcat(buf, argv[2]); strcat(buf, " "); strcat(buf, argv[3]);
+
+    if (send(sockfd, buf, MSGLEN, 0) == -1) throw("could not send message");
+
 
 
     close(sockfd);

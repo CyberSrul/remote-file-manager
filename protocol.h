@@ -14,6 +14,7 @@
 #define BACKLOG 20
 #define CLIENT 0
 #define SERVER 1
+#define MSGLEN 1000
 
 
 
