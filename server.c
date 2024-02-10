@@ -1,15 +1,5 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <sys/wait.h>
 #include <signal.h>
+#include <sys/wait.h>
 #include "protocol.h"
 
 
@@ -31,13 +21,13 @@ int main(void)
     /* 1. setup */
 
     int server_sock, client_sock, get_adds_status;
-    struct addrinfo sock_spesifics, * server_adds_list, * server_add;
+    struct addrinfo sock_spesifics, * server_adds_list, server_add;
     struct sockaddr_storage client_add;
-    socklen_t sin_size;
+    socklen_t sin_size = sizeof client_add;
     char ip[INET6_ADDRSTRLEN];
     struct sigaction sa;
 
-    // setting up hints, we'll work IPv6 using TCP and this hosts IP
+    // We'll work IPv6 using TCP and this hosts IP
     bzero(& sock_spesifics, sizeof sock_spesifics);
     sock_spesifics.ai_family = AF_INET6;
     sock_spesifics.ai_socktype = SOCK_STREAM;
@@ -49,31 +39,12 @@ int main(void)
 
     if ((get_adds_status = getaddrinfo(NULL, PORT, & sock_spesifics, & server_adds_list)) != 0) throw(gai_strerror(get_adds_status));
 
-    // loop through all the results and bind to the first we can
-    for(server_add = server_adds_list; server_add != NULL; server_add = server_add -> ai_next)
-    {
-        if ((server_sock = socket(server_add -> ai_family, server_add -> ai_socktype, server_add -> ai_protocol)) == -1)
-        {
-            perror("server: socket");
-            continue;
-        }
-
-        if (bind(server_sock, server_add -> ai_addr, server_add -> ai_addrlen) == -1)
-        {
-            close(server_sock);
-            perror("server: bind");
-            continue;
-        }
-
-        break;
-    }
+    server_sock = get_working_socket(server_adds_list, & server_add, SERVER);
 
     freeaddrinfo(server_adds_list);
 
-    if (server_add == NULL) throw("could not find any proper internet card");
 
-
-    /* 3. allocating waiting queue */
+    /* 3. Getting ready to handle clients */
 
     if (listen(server_sock, BACKLOG) == -1) throw("could not allocate wating queue");
 
@@ -91,11 +62,9 @@ int main(void)
 
     while(1)
     {
-        sin_size = sizeof client_add;
-        client_sock = accept(server_sock, (struct sockaddr *) & client_add, & sin_size);
-        if (client_sock == -1)
+        if ((client_sock = accept(server_sock, (struct sockaddr *) & client_add, & sin_size)) == -1)
         {
-            perror("accept");
+            fflush(stderr);
             continue;
         }
 

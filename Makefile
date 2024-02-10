@@ -1,14 +1,15 @@
-compiler := gcc
+compiler = gcc
 executables = client server
+flags = -Wall -g3
 
 
 all: client server
 
 client:	client.c protocol.h
-		$(compiler) client.c -o client
+		$(compiler) $(flags) client.c -o client
 
 server:	server.c protocol.h
-		$(compiler) server.c -o server
+		$(compiler) $(flags) server.c -o server
 
 clean:
 		rm -r $(executables)
