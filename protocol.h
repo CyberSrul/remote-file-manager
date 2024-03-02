@@ -26,9 +26,9 @@ void throw(const char * msg)
 }
 
 
-int get_working_socket(struct addrinfo * cur_add, struct addrinfo * final_add, const int mode)
+int hot_socket(struct addrinfo * cur_add, struct addrinfo * final_add, const int server_mode)
 {
-    int (* action)(int, const struct sockaddr *, socklen_t) = mode ? bind : connect;
+    int (* action)(int, const struct sockaddr *, socklen_t) = server_mode ? bind : connect;
     int sockfd;
 
 
@@ -50,8 +50,36 @@ int get_working_socket(struct addrinfo * cur_add, struct addrinfo * final_add, c
         break;
     }
 
+
     if (! cur_add) throw("Failed to initiate a working socket");
-    else * final_add = * cur_add;
+
+    if (server_mode && listen(sockfd, BACKLOG) == -1) throw("could not allocate waiting queue");
+
+    * final_add = * cur_add;
 
     return sockfd;
+}
+
+
+void print_address(const struct sockaddr_in6 * address, const int server_mode) {
+
+    static char ip[INET6_ADDRSTRLEN];
+
+    bzero(ip, sizeof ip);
+
+    inet_ntop(AF_INET6, &(address -> sin6_addr), ip, INET6_ADDRSTRLEN);
+    
+    printf("%s %s\n", server_mode ? "got connection from:" : "connected to:",  ip);
+}
+
+
+
+void sock_protocol(struct addrinfo * specs, const int server_mode)
+{
+    bzero(specs, sizeof * specs);
+
+    specs -> ai_family = AF_INET6;
+    specs -> ai_socktype = SOCK_STREAM;
+
+    if (server_mode) specs -> ai_flags = AI_PASSIVE;
 }

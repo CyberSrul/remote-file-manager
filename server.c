@@ -5,9 +5,28 @@
 
 
 
+void attend_client(int client_sock)
+{
+    char buf[MSGLEN + 1] = {0}, * token;
+
+    if (recv(client_sock, buf, MSGLEN, 0) == -1) throw("could not recive nessage");
+
+    printf("The client's message is: %s \n", buf);
+
+    token = strtok(buf, " ");
+
+    if      (strcmp(token, "GET") == 0)  printf("the client requests to retrive a file \n");
+    else if (strcmp(token, "POST") == 0) printf("the client requests to post a file \n");
+    else                                 perror("unfamiliar request \n");
+
+
+    close(client_sock);
+    exit(EXIT_SUCCESS);
+}
+
+
 void sigchld_handler(int s)
 {
-    // waitpid() might overwrite errno, so we save and restore it:
     int saved_errno = errno;
 
     while(waitpid(-1, NULL, WNOHANG) > 0);
@@ -16,50 +35,46 @@ void sigchld_handler(int s)
 }
 
 
-int main(int argc, char * argv[])
+void hang_sig_handlers()
 {
-    /* 1. setup */
-
-    int server_sock, client_sock, get_adds_status;
-    struct addrinfo sock_spesifics, * server_adds_list, server_add;
-    struct sockaddr_storage client_add;
-    socklen_t sin_size = sizeof client_add;
     struct sigaction sa;
-    char ip[INET6_ADDRSTRLEN], buf[MSGLEN + 1] = {0}, * token;
-
-    // We'll work IPv6 using TCP and this hosts IP
-    bzero(& sock_spesifics, sizeof sock_spesifics);
-    sock_spesifics.ai_family = AF_INET6;
-    sock_spesifics.ai_socktype = SOCK_STREAM;
-    sock_spesifics.ai_flags = AI_PASSIVE;
-
-
-
-    /* 2. seting up server socket */
-
-    if ((get_adds_status = getaddrinfo(NULL, PORT, & sock_spesifics, & server_adds_list)) != 0) throw(gai_strerror(get_adds_status));
-
-    server_sock = get_working_socket(server_adds_list, & server_add, SERVER);
-
-    freeaddrinfo(server_adds_list);
-
-
-
-    /* 3. Getting ready to handle clients */
-
-    if (listen(server_sock, BACKLOG) == -1) throw("could not allocate wating queue");
 
     // reap all dead processes
     sa.sa_handler = sigchld_handler;
-    sigemptyset(&sa.sa_mask);
+    sigemptyset(& sa.sa_mask);
     sa.sa_flags = SA_RESTART;
-    if (sigaction(SIGCHLD, &sa, NULL) == -1) throw("sigaction");
+    if (sigaction(SIGCHLD, & sa, NULL) == -1) throw("could not hang signal handler");
+}
+
+
+int main(int argc, char * argv[])
+{
+    /* 1. set up */
+
+    int server_sock, client_sock, get_adds_status;
+    struct addrinfo specs, * server_adds_list, server_add;
+    struct sockaddr_storage client_add;
+    socklen_t sin_size = sizeof client_add;
+
+    hang_sig_handlers();
 
 
 
-    /* 4. taking care of clients */
+    /* 2. opening hot server socket */
 
-    printf("server: waiting for connections...\n");
+    sock_protocol(& specs, SERVER);
+
+    if ((get_adds_status = getaddrinfo(NULL, PORT, & specs, & server_adds_list)) != 0) throw(gai_strerror(get_adds_status));
+
+    server_sock = hot_socket(server_adds_list, & server_add, SERVER);
+
+    freeaddrinfo(server_adds_list);
+
+    printf("waiting for connections... \n");
+
+
+
+    /* 3. taking care of clients */
 
     while(1)
     {
@@ -69,28 +84,12 @@ int main(int argc, char * argv[])
             continue;
         }
 
-        inet_ntop(client_add.ss_family, & (((struct sockaddr_in6 *) & client_add) -> sin6_addr), ip, sizeof ip);
-        printf("server: got connection from %s\n", ip);
+        print_address((struct sockaddr_in6 *) & client_add, SERVER);
 
-
-        // Attending to client
         if ( ! fork())
         {
             close(server_sock);
-
-            if (recv(client_sock, buf, MSGLEN, 0) == -1) throw("could not recive nessage");
-
-            printf("The client's message is: %s \n", buf);
-
-            token = strtok(buf, " ");
-
-            if      (strcmp(token, "GET") == 0)  printf("the client requests to retrive a file \n");
-            else if (strcmp(token, "POST") == 0) printf("the client requests to post a file \n");
-            else                                 perror("unfamiliar request \n");
-
-
-            close(client_sock);
-            exit(EXIT_SUCCESS);
+            attend_client(client_sock);
         }
 
         close(client_sock);

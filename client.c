@@ -11,32 +11,28 @@ int main(int argc, char *argv[])
     /* 1. set up */
 
     int sockfd, get_adds_status;
-    struct addrinfo sock_spesifics, * server_adds_list, server_add;
-    char ip[INET6_ADDRSTRLEN], buf[MSGLEN + 1] = {0};
-
-    // We'll work IPv6 using TCP
-    bzero( & sock_spesifics, sizeof sock_spesifics);
-    sock_spesifics.ai_family = AF_INET6;
-    sock_spesifics.ai_socktype = SOCK_STREAM;
+    struct addrinfo specs, * server_adds_list, server_add;
+    char buf[MSGLEN + 1] = {0};
 
 
 
-    /* 2. setting up socket and ettempting to connect */
+    /* 2. open hot client socket */
 
-    if ((get_adds_status = getaddrinfo(argv[1], PORT, & sock_spesifics, & server_adds_list)) != 0) throw(gai_strerror(get_adds_status));
+    sock_protocol(& specs, CLIENT);
 
-    sockfd = get_working_socket(server_adds_list, & server_add, CLIENT);
+    if ((get_adds_status = getaddrinfo(argv[1], PORT, & specs, & server_adds_list)) != 0) throw(gai_strerror(get_adds_status));
+
+    sockfd = hot_socket(server_adds_list, & server_add, CLIENT);
 
     freeaddrinfo(server_adds_list);
 
-    inet_ntop(server_add.ai_family, & (((struct sockaddr_in6 * ) server_add.ai_addr) -> sin6_addr), ip, sizeof ip);
-    printf("client: connecting to %s\n", ip);
+    print_address((struct sockaddr_in6 * ) server_add.ai_addr, CLIENT);
 
 
 
-    /* 3. sending a message */
+    /* 3. send request */
 
-    strcat(buf, argv[2]); strcat(buf, " "); strcat(buf, argv[3]);
+    snprintf(buf, sizeof(buf), "%s %s", argv[2], argv[3]);
 
     if (send(sockfd, buf, MSGLEN, 0) == -1) throw("could not send message");
 
